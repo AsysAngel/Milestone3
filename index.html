@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Search App</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .search-section, .bookshelf-section {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .search-section h2, .bookshelf-section h2 {
+            margin-top: 0;
+        }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .search-box input {
+            flex: 1;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .search-box button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .search-box button:hover {
+            background-color: #0056b3;
+        }
+        .results, .bookshelf-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        .book-item {
+            text-align: center;
+            cursor: pointer;
+        }
+        .book-item img {
+            max-width: 100px;
+            height: auto;
+            border-radius: 4px;
+        }
+        .book-item p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .pagination {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .pagination a {
+            margin: 0 5px;
+            padding: 5px 10px;
+            text-decoration: none;
+            color: #007bff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .pagination a.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .pagination a:hover {
+            background-color: #e9ecef;
+        }
+        .details-section {
+            grid-column: 1 / -1;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .details-section img {
+            max-width: 150px;
+            margin-right: 20px;
+            float: left;
+        }
+        .details-section h3 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="search-section">
+            <h2>Book Search</h2>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Enter search terms...">
+                <button onclick="searchBooks(1)">Search</button>
+            </div>
+            <div class="results" id="searchResults"></div>
+            <div class="pagination" id="pagination"></div>
+            <p id="currentPage"></p>
+        </div>
+        <div class="bookshelf-section">
+            <h2>My Bookshelf</h2>
+            <div class="results" id="bookshelfResults"></div>
+        </div>
+        <div class="details-section" id="bookDetails">
+            <h2>Book Details</h2>
+        </div>
+    </div>
+
+    <script>
+        let currentSearchTerm = '';
+        const itemsPerPage = 10;
+        const maxResults = 50;
+
+        function searchBooks(page) {
+            const query = $('#searchInput').val().trim();
+            if (!query) return;
+            currentSearchTerm = query;
+            const startIndex = (page - 1) * itemsPerPage;
+
+            $.getJSON(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=${itemsPerPage}&startIndex=${startIndex}`, function(data) {
+                displayResults(data.items, '#searchResults');
+                displayPagination(page, data.totalItems);
+                $('#currentPage').text(`Page ${page} of ${Math.ceil(Math.min(data.totalItems, maxResults) / itemsPerPage)}`);
+            });
+        }
+
+        function displayResults(books, target) {
+            $(target).empty();
+            if (!books) return;
+            books.forEach(book => {
+                const img = book.volumeInfo.imageLinks?.thumbnail || 'https://via.placeholder.com/100';
+                const title = book.volumeInfo.title || 'No Title';
+                $(target).append(`
+                    <div class="book-item" data-id="${book.id}">
+                        <img src="${img}" alt="${title}">
+                        <p>${title.substring(0, 30)}${title.length > 30 ? '...' : ''}</p>
+                    </div>
+                `);
+            });
+        }
+
+        function displayPagination(currentPage, totalItems) {
+            const totalPages = Math.ceil(Math.min(totalItems, maxResults) / itemsPerPage);
+            $('#pagination').empty();
+            for (let i = 1; i <= totalPages; i++) {
+                $('#pagination').append(`
+                    <a href="#" class="${i === currentPage ? 'active' : ''}" onclick="searchBooks(${i})">${i}</a>
+                `);
+            }
+        }
+
+        function displayBookDetails(bookId) {
+            $.getJSON(`https://www.googleapis.com/books/v1/volumes/${bookId}`, function(data) {
+                const info = data.volumeInfo;
+                const img = info.imageLinks?.thumbnail || 'https://via.placeholder.com/150';
+                const title = info.title || 'No Title';
+                const authors = info.authors?.join(', ') || 'Unknown Author';
+                const description = info.description || 'No description available';
+                $('#bookDetails').html(`
+                    <img src="${img}" alt="${title}">
+                    <h3>${title}</h3>
+                    <p><strong>Author(s):</strong> ${authors}</p>
+                    <p><strong>Description:</strong> ${description.substring(0, 500)}${description.length > 500 ? '...' : ''}</p>
+                `);
+            });
+        }
+
+        // Static bookshelf data
+const myBookshelf = [
+    {
+        id: "book1",
+        volumeInfo: {
+            title: "Solo Leveling",
+            authors: ["Chugong"],
+            imageLinks: { thumbnail: "https://books.google.com/books/content?id=NewOEAAAQBAJ&printsec=frontcover&img=1&zoom=5&edge=curl" },
+            description: "THE WEAKEST HUNTER OF ALL MANKIND! E-rank hunter Jinwoo Sung has no money, no talent, and no prospects to speak of-and apparently, no luck, either! When he enters a hidden double dungeon one fateful day, he’s abandoned by his party and left to die at the hands of some of the most horrific monsters he’s ever encountered. But just before the last, fatal blow... PING! [Congratulations on becoming a Player.]"
+        }
+    },
+    {
+        id: "book2",
+        volumeInfo: {
+            title: "The Beginning After The End: Early Years, Book 1",
+            authors: ["TurtleMe"],
+            imageLinks: { thumbnail: "https://books.google.com/books/content?id=5nXEDwAAQBAJ&printsec=frontcover&img=1&zoom=5&edge=curl" },
+            description: "Volume 1 of The Beginning After The End I never believed in the whole “light at the end of the tunnel” folly where people, after having a near-death experience, would startle awake in a cold sweat exclaiming, “I saw the light!” But there I was, in this so-called “tunnel” facing a glaring light, when the last thing I remembered was sleeping in my room—the royal bedchamber, as others called it. Had I died? If so, how? King Grey once benefited from unrivaled strength, wealth, and prestige in a world governed by martial ability, but now finds himself reborn in a society dominated by magic. Given a second chance at life, the once-king strives to understand his role in this new world and the purpose of his reincarnation while correcting the mistakes of his past."
+        }
+    },
+    {
+        id: "book3",
+        volumeInfo: {
+            title: "The Lightning Thief",
+            authors: ["Rick Riordan"],
+            imageLinks: { thumbnail: "https://books.google.com/books/content?id=vukJMQAACAAJ&printsec=frontcover&img=1&zoom=1&imgtk=AFLRE71Gzbw02z0retqsbtlmf33zwUwqvxj1DOBmt4a-LVVKhMeH8evSMGDRQjgzu2Ft2rU39D5Ztsg3GrzWF_rVxr9g1b20R8LlQfJxx_xGbHRytixYMOEyOmzFZsqI3a_xadmlHY0Q" },
+            description: "Percy Jackson is about to be kicked out of boarding school ... again. And that's the least of his troubles. Lately, mythological monsters and the gods of Mount Olympus seem to be walking straight out of the pages of Percy's Greek mythology textbook and into his life. And worse, he's angered a few of them. Zeus's master lightning bolt has been stolen, and Percy is the prime suspect. Now Percy and his friends have just ten days to find and return Zeus's stolen property and bring peace to a warring Mount Olympus. But to succeed on his quest, Percy will have to do more than catch the true thief: he must comes to terms with the father who abandoned him; solve the riddle of the Oracle, which warns him of betrayal by a friend; and unravel a treachery more powerful than the gods themselves."
+        }
+    },
+    {
+        id: "book4",
+        volumeInfo: {
+            title: "Shadow Slave: Webnovel",
+            authors: ["Guiltythree"],
+            imageLinks: { thumbnail: "https://books.google.com/books/publisher/content?id=jn6xEAAAQBAJ&printsec=frontcover&img=1&zoom=1&edge=curl&imgtk=AFLRE71f6s-KlmwyidMpZeo-pXJkHq4NarK01ScP_3gaMyWGSfq_dRjQ43RTDrjS9m2vkSU-lEnRKDR1bhYJPpcJrAAYz0PeIRzZML1LgpagUd8eb6DoDF6v4oxk_e-C_dTabZWp4YaZ" },
+            description: "Growing up in poverty, Sunny never expected anything good from life. However, even he did not anticipate being chosen by the Nightmare Spell and becoming one of the Awakened - an elite group of people gifted with supernatural powers. Transported into a ruined magical world, he found himself facing against terrible monsters - and other Awakened - in a deadly battle of survival. What's worse, the shadow powers he received happened to possess a small, but potentially fatal side effect..."
+        }
+    },
+    {
+        id: "book5",
+        volumeInfo: {
+            title: "The Author's POV: Webnovel",
+            authors: ["Chugong"],
+            imageLinks: { thumbnail: "https://books.google.com/books/content?id=NFp9EAAAQBAJ&printsec=frontcover&img=1&zoom=5&edge=curl" },
+            description: "[Webnovel provides the latest update of The Author's POV] The person whom the world revolves around. The person who defeats all of his opponents, and ultimately gets the beautiful girl. The sole existence all villains fear. That is the protagonist. What about me? As a failed author who had only one success throughout his whole career, I had reincarnated into my late novel. This is it I thought, as I tightly clenched my fist. Did I just get reincarnated in my own novel? Is this where I reincarnate in a novel and become the protagonist? No. Sadly it's not that kind of novel, as I reincarnated as a mob. The world doesn't revolve around me. The girls don't come flocking towards me. The cheat items don't come to me. Phew I let out a sigh of relief. Thank god I'm not the protagonist I joyfully shouted as tears streamed down my cheeks. Wait, are you curious as to why I don't want to be the protagonist? I did forget to mention the most important thing when I was describing a protagonist. That is... They are calamity magnets. I just died. If I learned something from that, it's that it really isn't a pleasant experience. If possible let me live a long stable life. Thank you, whoever reincarnated me. I would later come to regret these words..."
+        }
+    },
+    {
+        id: "book6",
+        volumeInfo: {
+            title: "The Fellowship of the Ring: Being the First Part of The Lord of the Rings",
+            authors: ["John Ronald Reuel Tolkien"],
+            imageLinks: { thumbnail: "https://books.google.com/books/content?id=ld5GswEACAAJ&printsec=frontcover&img=1&zoom=1&imgtk=AFLRE72IkbLMXqmF94v-1BFXo3TPxwDCi0LA-rmWNDDMJQCarCF8RY1hL8z5GBm0fe-eE6Ko1C6Eh5Ka4S3xw1R0ioW_r8QHB_4xtLQ_lu-CYsmXDk40iMeONwvwRynZkZSuQZUa3phx" },
+            description: "Frodo the hobbit and a band of warriors from the different kingdoms set out to destroy the Ring of Power before the evil Sauron grasps control."
+        }
+    },
+];
+
+// Modified loadBookshelf function
+function loadBookshelf() {
+    displayResults(myBookshelf, '#bookshelfResults');
+}
+
+function displayBookDetails(bookId) {
+    // Check if the book is in the hardcoded bookshelf
+    const hardcodedBook = myBookshelf.find(book => book.id === bookId);
+    if (hardcodedBook) {
+        const info = hardcodedBook.volumeInfo;
+        const img = info.imageLinks?.thumbnail || 'https://via.placeholder.com/150';
+        const title = info.title || 'No Title';
+        const authors = info.authors?.join(', ') || 'Unknown Author';
+        const description = info.description || 'No description available';
+        $('#bookDetails').html(`
+            <img src="${img}" alt="${title}">
+            <h3>${title}</h3>
+            <p><strong>Author(s):</strong> ${authors}</p>
+            <p><strong>Description:</strong> ${description.substring(0, 500)}${description.length > 500 ? '...' : ''}</p>
+        `);
+    } else {
+        // Fallback to API for search result books
+        $.getJSON(`https://www.googleapis.com/books/v1/volumes/${bookId}`, function(data) {
+            const info = data.volumeInfo;
+            const img = info.imageLinks?.thumbnail || 'https://via.placeholder.com/150';
+            const title = info.title || 'No Title';
+            const authors = info.authors?.join(', ') || 'Unknown Author';
+            const description = info.description || 'No description available';
+            $('#bookDetails').html(`
+                <img src="${img}" alt="${title}">
+                <h3>${title}</h3>
+                <p><strong>Author(s):</strong> ${authors}</p>
+                <p><strong>Description:</strong> ${description.substring(0, 500)}${description.length > 500 ? '...' : ''}</p>
+            `);
+        });
+    }
+}
+
+        $(document).on('click', '.book-item', function() {
+            const bookId = $(this).data('id');
+            displayBookDetails(bookId);
+        });
+
+        $(document).ready(function() {
+            loadBookshelf();
+        });
+    </script>
+</body>
+</html>
